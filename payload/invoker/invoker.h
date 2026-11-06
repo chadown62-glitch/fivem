@@ -12,6 +12,7 @@ namespace ollie::invoker {
     using NativeHandler = void(*)(void* ctx);
 
     NativeHandler get(std::uint64_t hash);
+    std::uint64_t* invoke_via_shv(std::uint64_t hash, const std::uint64_t* args, std::uint32_t argc);
 
     struct Context {
         void*        returns;
@@ -37,18 +38,15 @@ namespace ollie::invoker {
         template<class R = std::uint64_t> R call(std::uint64_t hash) {
             auto h = get(hash);
             if (!h) { m_argc = 0; return R{}; }
-            Context ctx{};
-            ctx.arg_count = m_argc;
-            ctx.args      = m_args;
-            ctx.returns   = m_ret;
-            h(&ctx);
+            // scripthookv path — the sentinel handler routes to invoke_via_shv
+            std::uint64_t* r = invoke_via_shv(hash, m_args, m_argc);
             m_argc = 0;
             if constexpr (std::is_same_v<R, void>) {
                 return;
             } else {
-                R r{};
-                std::memcpy(&r, m_ret, (std::min)(sizeof(R), sizeof(m_ret)));
-                return r;
+                R out{};
+                if (r) std::memcpy(&out, r, (std::min)(sizeof(R), sizeof(std::uint64_t) * 3));
+                return out;
             }
         }
     private:
