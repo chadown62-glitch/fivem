@@ -123,12 +123,15 @@ namespace ollie::pointers {
         game_size = mi.SizeOfImage;
         log::line("game base %p size %zx", (void*)game_base, game_size);
 
-        native_registration_table = resolve_first(g_ntab_sigs,    sizeof(g_ntab_sigs)   /sizeof(*g_ntab_sigs),    "ntab   ");
-        world_ptr                 = resolve_first(g_world_sigs,   sizeof(g_world_sigs)  /sizeof(*g_world_sigs),   "world  ");
-        globals_ptr               = resolve_first(g_globals_sigs, sizeof(g_globals_sigs)/sizeof(*g_globals_sigs), "globals");
-
-        log::line("resolved ntab=%p world=%p glob=%p",
-                  (void*)native_registration_table, (void*)world_ptr, (void*)globals_ptr);
+        // Sig scanning on GTA5.exe is a dead path: the module is Arxan-packed,
+        // bytes on disk != bytes in memory, and raw byte walking can hit protected
+        // pages that trip Arxan's VEH -> subprocess crash. We take the scripthookv
+        // export route instead (see invoker.cpp), so these pointers are no longer
+        // required. Keep them zeroed.
+        native_registration_table = 0;
+        world_ptr                 = 0;
+        globals_ptr               = 0;
+        log::line("sig scan skipped (scripthookv route owns native invocation)");
         return true;
     }
 }
