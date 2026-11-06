@@ -27,18 +27,21 @@ $shv = "$fapp\scripthookv.dll"
 if (Test-Path $shv) { ok "scripthookv.dll present ($((Get-Item $shv).Length) bytes)" }
 else { ko "scripthookv.dll MISSING -- natives will not fire"; $issues += "no scripthookv" }
 
-hd "3. FiveM running"
-$fivem_procs = Get-Process | Where-Object { $_.ProcessName -match 'FiveM|gtaprocess' } | Sort-Object WS -Descending
+hd "3. FiveM running (NOT vanilla GTA5)"
+$fivem_procs = Get-Process | Where-Object { $_.ProcessName -match 'FiveM|CitizenFX|gtaprocess' } | Sort-Object WS -Descending
 if (-not $fivem_procs) { ko "no FiveM-related process running -- start FiveM FIRST"; $issues += "fivem not running" }
 else {
     foreach ($p in $fivem_procs) {
         $mb = [math]::Round($p.WS/1MB, 0)
         info "$($p.ProcessName) pid=$($p.Id) ws=${mb}MB"
     }
-    $game = $fivem_procs | Where-Object { $_.ProcessName -match 'gtaprocess' } | Select-Object -First 1
-    if ($game) { ok "game child found: $($game.ProcessName) pid=$($game.Id)" }
-    else {
-        wa "FiveM launcher running but no gtaprocess child yet -- WAIT until the game window is up"
+    $game = $fivem_procs | Where-Object { $_.ProcessName -match 'gtaprocess|CitizenFX_SubProcess_game' } | Sort-Object WS -Descending | Select-Object -First 1
+    if ($game) {
+        $mb = [math]::Round($game.WS/1MB, 0)
+        ok "FiveM game child: $($game.ProcessName) pid=$($game.Id) ws=${mb}MB"
+        if ($mb -lt 500) { wa "process ws=${mb}MB is small -- game may still be loading, wait for full in-game" }
+    } else {
+        wa "FiveM launcher running but no game subprocess yet -- WAIT until you see the game world"
         $issues += "game not loaded"
     }
 }

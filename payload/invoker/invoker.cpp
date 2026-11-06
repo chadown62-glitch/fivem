@@ -24,16 +24,53 @@ namespace ollie::invoker {
     static thread_local std::uint64_t g_last_return[3] = {};
 
     bool init() {
-        // scripthookv.dll is already loaded by FiveM. GetModuleHandle is safe —
-        // standalone LoadLibrary fails because of circular GTA runtime deps.
+        // --- FiveM-aware scripthookv acquisition ---
+        // FiveM auto-loads scripthookv.dll from its .app folder ONLY when it exists
+        // there AND the user has single-player mode ("FXDK"/"story") OR the server
+        // allows it. On many public servers FiveM strips scripthookv on boot.
+        // Try, in order:
+        //   1. Already in-process (FiveM loaded it at boot)
+        //   2. Load from %LOCALAPPDATA%\FiveM\FiveM.app\scripthookv.dll (standard path)
+        //   3. Load from the FiveM process root (next to FiveM_GTAProcess.exe)
+        //   4. Bare LoadLibrary (search current dir + PATH)
         g_shv = GetModuleHandleA("scripthookv.dll");
+        if (g_shv) log::line("invoker: scripthookv already loaded in-process @ %p", (void*)g_shv);
         if (!g_shv) {
-            // fallback in case name casing differs
             g_shv = GetModuleHandleA("ScriptHookV.dll");
+            if (g_shv) log::line("invoker: ScriptHookV (capital) already in-process @ %p", (void*)g_shv);
+        }
+
+        if (!g_shv) {
+            // #2 FiveM.app absolute path
+            char local[MAX_PATH]{};
+            if (GetEnvironmentVariableA("LOCALAPPDATA", local, MAX_PATH)) {
+                char p[MAX_PATH]{};
+                _snprintf_s(p, sizeof(p), _TRUNCATE,
+                            "%s\\FiveM\\FiveM.app\\scripthookv.dll", local);
+                g_shv = LoadLibraryA(p);
+                if (g_shv) log::line("invoker: loaded scripthookv from %s", p);
+                else      log::line("invoker: LoadLibrary(%s) failed err=%lu", p, GetLastError());
+            }
         }
         if (!g_shv) {
-            // last resort — maybe we have to load it explicitly
+            // #3 beside FiveM_GTAProcess.exe
+            char exe[MAX_PATH]{};
+            if (GetModuleFileNameA(nullptr, exe, MAX_PATH)) {
+                char* slash = strrchr(exe, '\\');
+                if (slash) {
+                    *(slash + 1) = 0;
+                    char p[MAX_PATH]{};
+                    _snprintf_s(p, sizeof(p), _TRUNCATE, "%sscripthookv.dll", exe);
+                    g_shv = LoadLibraryA(p);
+                    if (g_shv) log::line("invoker: loaded scripthookv from %s", p);
+                    else      log::line("invoker: LoadLibrary(%s) failed err=%lu", p, GetLastError());
+                }
+            }
+        }
+        if (!g_shv) {
             g_shv = LoadLibraryA("scripthookv.dll");
+            if (g_shv) log::line("invoker: loaded scripthookv via PATH");
+            else       log::line("invoker: LoadLibrary(scripthookv.dll) failed err=%lu", GetLastError());
         }
         if (!g_shv) {
             log::line("invoker: scripthookv.dll not in process -- natives disabled");
