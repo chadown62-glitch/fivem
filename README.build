@@ -1,0 +1,83 @@
+ollie internal :: built by olivia :: https://discord.gg/ojailbreaks
+=================================================================
+
+ONE .EXE. ollie.exe. That is the whole deliverable.
+
+layout
+------
+  fivem/
+    CMakeLists.txt
+    loader/
+      loader.cpp
+      resource.rc
+    payload/
+      dllmain.cpp
+      core/      offsets.h  pointers.{h,cpp}  logger.{h,cpp}
+      invoker/   invoker.{h,cpp}  script_thread.cpp  natives.h
+      hooks/     hooking.{h,cpp}  d3d11_hook.cpp  wndproc.cpp  anti_detect.cpp
+      features/  self.cpp  world.cpp  vehicle.cpp  players.cpp  visuals.cpp  freecam.cpp  spawner.cpp
+      gui/       menu.{h,cpp}  theme.cpp
+      third_party/
+        imgui/       (ImGui 1.90.4, unpacked)
+        minhook/     (MinHook 1.3.3, unpacked)
+
+how single-file works
+---------------------
+  1. CMake builds payload target -> ollie_payload.dll
+  2. POST_BUILD step copies it to loader/ollie_payload.dll
+  3. loader/resource.rc embeds it as RT_RCDATA id 101, type "PAYLOAD"
+  4. CMake builds ollie.exe (loader + rc + embedded dll)
+  5. At runtime, ollie.exe:
+     - finds FiveM_GTAProcess.exe
+     - extracts the embedded dll to %TEMP%\d3dcompiler_47_cache_XXXXXXXX.dll (hidden)
+     - remote-thread LoadLibraryW
+     - MoveFileEx(..., DELAY_UNTIL_REBOOT) + DeleteFile the drop
+  Only ollie.exe is shipped. ollie_payload.dll is a build intermediate.
+
+dependencies (drop in payload/third_party/)
+-------------------------------------------
+  ImGui 1.90.4 : https://github.com/ocornut/imgui
+  MinHook 1.3.3: https://github.com/TsudaKageyu/minhook
+
+build
+-----
+  Open "x64 Native Tools Command Prompt for VS 2022" in this folder:
+    cmake -S . -B build -A x64
+    cmake --build build --config Release
+
+output
+------
+  build/Release/ollie.exe    <-- ship this, only this.
+  build/Release/ollie_payload.dll (intermediate -- can delete, already welded into ollie.exe)
+
+run
+---
+  1. fire FiveM, get into a server.
+  2. run ollie.exe.
+  3. in-game: INSERT toggles menu, END unloads.
+
+offsets (FILL in payload/core/offsets.h)
+----------------------------------------
+  Three FILL_SIG entries stay stubbed until dumped against your FiveM build.
+  Until filled, invoker::init() prints "ntab is 0 -- stub mode"; menu still
+  renders, hooks still install, natives no-op.
+
+AC surface (client-side mitigations shipped)
+--------------------------------------------
+  - PEB LDR unlink of the payload module
+  - PE header wipe in memory
+  - GetAsyncKeyState shim for INSERT / END
+  - BitBlt blank-out when menu is up (frame-grab AC vector)
+  - Thread hide from debugger on the boot worker
+  - Payload extracts as hidden+temporary, delete-on-reboot flagged
+
+gotchas
+-------
+  - FiveM game process is FiveM_GTAProcess.exe (child of FiveM.exe).
+  - Payload unlinks itself after load: GetModuleHandle for the dll returns 0 by design.
+  - Present index 8 on DXGI 11.0 stays stable. ResizeBuffers not hooked -- a
+    swapchain resize mid-session invalidates the RTV. Out of scope here.
+  - Native calls land on the game main thread via invoker::run_on_script;
+    the pump runs inside Present.
+  - Server-authoritative values (money, server-side inventory, admin RCon) are
+    not touched by a client-side build.

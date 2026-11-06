@@ -1,0 +1,27 @@
+// loader/resource.rc
+// CMake copies the built ollie_payload.dll next to this .rc as "ollie_payload.dll"
+// in a POST_BUILD step on the payload target, before the loader's rc compile runs.
+#include <windows.h>
+
+101 PAYLOAD "ollie_payload.dll"
+
+1 VERSIONINFO
+FILEVERSION     1,0,0,0
+PRODUCTVERSION  1,0,0,0
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904b0"
+    BEGIN
+      VALUE "CompanyName",      "olivia"
+      VALUE "FileDescription",  "ollie"
+      VALUE "FileVersion",      "1.0"
+      VALUE "ProductName",      "ollie"
+      VALUE "ProductVersion",   "1.0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x0409, 0x04b0
+  END
+END
