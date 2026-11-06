@@ -1,5 +1,4 @@
 build/
-payload/third_party/
 loader/ollie_payload.dll
 *.vcxproj
 *.vcxproj.filters
