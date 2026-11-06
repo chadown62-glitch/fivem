@@ -20,19 +20,17 @@ static DWORD WINAPI boot(LPVOID) {
     if (!invoker::init())  { log::line("invoker init failed");  goto done; }
 
     // --- PROOF-OF-LIFE SELF-TEST ---
-    // Call PLAYER_ID + GET_GAME_TIMER through scripthookv. If natives are wired,
-    // PLAYER_ID returns 0-31 (slot) and GET_GAME_TIMER returns a non-zero ms tick.
-    // The log captures both, which Olivia can read from %TEMP%\ollie.log after injection.
+    // Gate the "NATIVES LIVE" verdict on actual scripthookv export resolution.
+    // In FiveM: scripthookv.dll is in-process, three exports resolve, natives fire.
+    // In a non-FiveM host: natives_ready() returns false, we say so plainly.
     for (int i = 0; i < 20; ++i) Sleep(100); // let scripthookv finish its own init
-    {
+    if (invoker::natives_ready()) {
         int pid  = N::PLAYER_ID();
         int tick = ollie::invoker::INVOKE<int>(ollie::offsets::h_GET_GAME_TIMER);
         log::line("SELF-TEST :: PLAYER_ID()=%d  GET_GAME_TIMER()=%d", pid, tick);
-        if (tick > 0 || pid >= 0) {
-            log::line("SELF-TEST :: NATIVES LIVE -- every toggle will fire in game.");
-        } else {
-            log::line("SELF-TEST :: natives returned 0/0 -- scripthookv present but not warm yet, menu still usable.");
-        }
+        log::line("SELF-TEST :: scripthookv exports resolved -- NATIVES LIVE.");
+    } else {
+        log::line("SELF-TEST :: scripthookv not in process -- natives OFF (expected outside FiveM).");
     }
     menu::init();
     log::line("live.");

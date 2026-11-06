@@ -55,6 +55,10 @@ namespace ollie::invoker {
         return true;
     }
 
+    bool natives_ready() {
+        return p_nativeInit != nullptr && p_nativePush64 != nullptr && p_nativeCall != nullptr;
+    }
+
     void shutdown() {
         if (g_shv) FreeLibrary(g_shv);
         g_shv = nullptr;

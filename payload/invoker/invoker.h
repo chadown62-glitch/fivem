@@ -13,6 +13,7 @@ namespace ollie::invoker {
 
     NativeHandler get(std::uint64_t hash);
     std::uint64_t* invoke_via_shv(std::uint64_t hash, const std::uint64_t* args, std::uint32_t argc);
+    bool natives_ready();
 
     struct Context {
         void*        returns;
